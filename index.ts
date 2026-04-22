@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 type ExportSessionToHtml = (
 	sessionManager: any,
@@ -17,26 +17,51 @@ function getShareViewerUrl(gistId: string): string {
 	return `${normalizedBase}${gistId}`;
 }
 
+function getNodeGlobalRoots(): string[] {
+	const roots = new Set<string>();
+	const execDir = path.dirname(process.execPath);
+	roots.add(path.resolve(execDir, "..", "lib", "node_modules"));
+	roots.add(path.resolve(execDir, "..", "..", "lib", "node_modules"));
+
+	for (const entry of (process.env.NODE_PATH || "").split(path.delimiter)) {
+		if (entry) roots.add(path.resolve(entry));
+	}
+
+	try {
+		const npmRoot = spawnSync("npm", ["root", "-g"], { encoding: "utf-8" });
+		if (npmRoot.status === 0 && npmRoot.stdout.trim()) {
+			roots.add(path.resolve(npmRoot.stdout.trim()));
+		}
+	} catch {
+		// Ignore npm lookup failures.
+	}
+
+	roots.add("/usr/lib/node_modules");
+	roots.add("/usr/local/lib/node_modules");
+	return [...roots];
+}
+
 function resolvePiPackageEntry(require: NodeRequire): string {
 	const cliArg = process.argv[1] || "";
-	const candidateRoots = [
+	const packageDirCandidates = [
 		process.env.PI_AGENT_PACKAGE_DIR,
 		cliArg ? path.resolve(path.dirname(cliArg), "..") : undefined,
-		"/usr/lib/node_modules/@mariozechner/pi-coding-agent",
-		"/usr/local/lib/node_modules/@mariozechner/pi-coding-agent",
+		...getNodeGlobalRoots().map((root) => path.join(root, "@mariozechner", "pi-coding-agent")),
 	]
 		.filter((value): value is string => Boolean(value))
 		.map((value) => path.resolve(value));
 
-	for (const root of candidateRoots) {
+	for (const root of packageDirCandidates) {
 		const packageEntry = path.join(root, "dist", "index.js");
 		if (fs.existsSync(packageEntry)) {
 			return packageEntry;
 		}
 	}
 
+	const extensionDir = path.dirname(fileURLToPath(import.meta.url));
+	const resolvePaths = [process.cwd(), extensionDir, ...getNodeGlobalRoots()];
 	return require.resolve("@mariozechner/pi-coding-agent", {
-		paths: [process.cwd(), "/usr/lib/node_modules", "/usr/local/lib/node_modules"],
+		paths: resolvePaths,
 	});
 }
 
