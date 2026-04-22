@@ -2,7 +2,6 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 
 type ExportSessionToHtml = (
@@ -32,8 +31,11 @@ export default function (pi: ExtensionAPI) {
     // Resolve the pi package root from its public entry, then navigate to the
     // internal export-html module. This is not part of the public API and may
     // break across releases — but it is the only way to access the HTML export.
-    const require = createRequire(import.meta.url);
-    const piEntry = require.resolve("@mariozechner/pi-coding-agent");
+    //
+    // Use import.meta.resolve() (ESM) instead of createRequire().resolve() (CJS)
+    // because the pi package's "exports" map only defines an "import" condition.
+    const piEntryUrl = import.meta.resolve("@mariozechner/pi-coding-agent");
+    const piEntry = new URL(piEntryUrl).pathname;
     const exportModulePath = path.join(
       path.dirname(piEntry),
       "core",
@@ -135,8 +137,6 @@ export default function (pi: ExtensionAPI) {
           [
             "gist",
             "create",
-            "--public",
-            "false",
             "--desc",
             requestedName,
             tmpFile,
@@ -165,10 +165,18 @@ export default function (pi: ExtensionAPI) {
         }
 
         const previewUrl = getShareViewerUrl(gistId);
-        if (ctx.hasUI) {
-          ctx.ui.notify(`Created gist '${requestedName}'`, "success");
-          ctx.ui.notify(`Share URL: ${previewUrl}`, "info");
-        }
+        pi.sendMessage(
+          {
+            customType: "share-as-result",
+            content:
+              `Shared session as **${requestedName}**\n\n` +
+              `- Share URL: ${previewUrl}\n` +
+              `- Gist URL: ${gistUrl}`,
+            display: true,
+            details: { requestedName, previewUrl, gistUrl, gistId },
+          },
+          { triggerTurn: false },
+        );
       } catch (error) {
         if (ctx.hasUI) {
           ctx.ui.notify(
