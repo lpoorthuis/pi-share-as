@@ -1,0 +1,11 @@
+{
+  "name": "pi-share-as",
+  "version": "0.1.0",
+  "description": "Pi package adding a /share-as command that creates a private GitHub gist with a custom description",
+  "type": "module",
+  "license": "MIT",
+  "keywords": ["pi-package"],
+  "pi": {
+    "extensions": ["./index.ts"]
+  }
+}
