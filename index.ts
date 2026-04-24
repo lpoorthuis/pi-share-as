@@ -142,7 +142,11 @@ export default function (pi: ExtensionAPI) {
         if (gistId) {
           const previewUrl = getShareViewerUrl(gistId);
           const fullDesc = `${requestedName} — ${previewUrl}`;
-          await pi.exec("gh", ["gist", "edit", gistId, "--desc", fullDesc], { signal: ctx.signal });
+          await pi.exec(
+            "gh",
+            ["api", "--method", "PATCH", `/gists/${gistId}`, "-f", `description=${fullDesc}`],
+            { signal: ctx.signal },
+          );
         }
         if (!gistUrl || !gistId) {
           if (ctx.hasUI) ctx.ui.notify("Failed to parse gist URL from gh output.", "error");
