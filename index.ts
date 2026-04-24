@@ -15,9 +15,7 @@ type ExportSessionToHtml = (
 
 function getShareViewerUrl(gistId: string): string {
   const base = process.env.PI_SHARE_VIEWER_URL || "https://pi.dev/session/";
-  const normalizedBase = base.includes("#")
-    ? base.replace(/#.*$/, "#")
-    : `${base}#`;
+  const normalizedBase = base.includes("#") ? base.replace(/#.*$/, "#") : `${base}#`;
   return `${normalizedBase}${gistId}`;
 }
 
@@ -36,12 +34,7 @@ export default function (pi: ExtensionAPI) {
     // because the pi package's "exports" map only defines an "import" condition.
     const piEntryUrl = import.meta.resolve("@mariozechner/pi-coding-agent");
     const piEntry = new URL(piEntryUrl).pathname;
-    const exportModulePath = path.join(
-      path.dirname(piEntry),
-      "core",
-      "export-html",
-      "index.js",
-    );
+    const exportModulePath = path.join(path.dirname(piEntry), "core", "export-html", "index.js");
     const mod = (await import(pathToFileURL(exportModulePath).href)) as {
       exportSessionToHtml: ExportSessionToHtml;
     };
@@ -50,8 +43,7 @@ export default function (pi: ExtensionAPI) {
   }
 
   pi.registerCommand("share-as", {
-    description:
-      "Create a private GitHub gist using a custom name: /share-as <name>",
+    description: "Create a private GitHub gist using a custom name: /share-as <name>",
     handler: async (args, ctx) => {
       const requestedName = args.trim() || pi.getSessionName()?.trim() || "";
       if (!requestedName) {
@@ -74,10 +66,7 @@ export default function (pi: ExtensionAPI) {
         const authResult = await pi.exec("gh", ["auth", "status"]);
         if (authResult.code !== 0) {
           if (ctx.hasUI)
-            ctx.ui.notify(
-              "GitHub CLI is not logged in. Run 'gh auth login' first.",
-              "error",
-            );
+            ctx.ui.notify("GitHub CLI is not logged in. Run 'gh auth login' first.", "error");
           return;
         }
       } catch {
@@ -95,9 +84,7 @@ export default function (pi: ExtensionAPI) {
       const tmpFile = path.join(tmpDir, "session.html");
 
       try {
-        const allTools = new Map(
-          pi.getAllTools().map((tool) => [tool.name, tool] as const),
-        );
+        const allTools = new Map(pi.getAllTools().map((tool) => [tool.name, tool] as const));
         const activeTools = pi
           .getActiveTools()
           .map((name) => allTools.get(name))
@@ -132,17 +119,9 @@ export default function (pi: ExtensionAPI) {
       }
 
       try {
-        const result = await pi.exec(
-          "gh",
-          [
-            "gist",
-            "create",
-            "--desc",
-            requestedName,
-            tmpFile,
-          ],
-          { signal: ctx.signal },
-        );
+        const result = await pi.exec("gh", ["gist", "create", "--desc", requestedName, tmpFile], {
+          signal: ctx.signal,
+        });
 
         if (result.code !== 0) {
           if (ctx.hasUI)
@@ -158,9 +137,15 @@ export default function (pi: ExtensionAPI) {
           .split(/\s+/)
           .find((part) => part.startsWith("https://gist.github.com/"));
         const gistId = gistUrl?.split("/").pop();
+
+        // Update the gist description to include the pi.dev/session viewer URL.
+        if (gistId) {
+          const previewUrl = getShareViewerUrl(gistId);
+          const fullDesc = `${requestedName} — ${previewUrl}`;
+          await pi.exec("gh", ["gist", "edit", gistId, "--desc", fullDesc], { signal: ctx.signal });
+        }
         if (!gistUrl || !gistId) {
-          if (ctx.hasUI)
-            ctx.ui.notify("Failed to parse gist URL from gh output.", "error");
+          if (ctx.hasUI) ctx.ui.notify("Failed to parse gist URL from gh output.", "error");
           return;
         }
 

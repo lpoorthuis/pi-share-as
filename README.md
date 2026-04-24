@@ -5,6 +5,7 @@ Pi package that adds a global `/share-as` command.
 ## What it does
 
 `/share-as <name>`:
+
 - exports the current Pi session as `session.html`
 - creates a **private GitHub gist**
 - uses `<name>` as the gist description
